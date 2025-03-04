@@ -1,15 +1,16 @@
 import ListItem from "@/components/ListItem";
-import Loader from "@/components/Loader";
 import SearchBar from "@/components/SearchBar";
 import { Interest } from "@/types";
 import { useEffect, useState } from "react";
 import { FlatList, StyleSheet, Text, View } from "react-native";
+import SkeletonListItem from "@/components/SkeletonListItem";
+
+// this will act as our cache storage. it will store interests array for query string key.
+// e.g: {'a': [], 'ap':[], ....}
+const cache = new Map<String, Interest[]>();
 
 // this is the main task. which is calling api and searching results
 export default function Search() {
-  // this will act as our cache storage. it will store interests array for query string key.
-  // e.g: {'a': [], 'ap':[], ....}
-  const cache = new Map<String, Interest[]>();
   // we will use this for rendering purposes and storing interests data
   const [listItems, setListItems] = useState<Interest[]>([]);
   // this will help in showing loader on screen during api calls
@@ -88,17 +89,22 @@ export default function Search() {
       const newResults: Interest[] = data.autocomplete;
       // set the newResult to searched query. so something liek this {"apple": [{},{},{}....]}
       cache.set(query, newResults);
-      // now here filter the previous and new results. we don't want duplicates in our render
-      setListItems((prev) => [
-        // filter prev results first. see if the interest name matches the query string
-        ...filterResults(prev, query),
-        // now Filter newResults to keep only items that are not already in prev
-        // For each newItem in newResults, check if any item in prev has the same id
-        // Only include newItem if (no) matching id is found in prev. this way we only keep the fresh ones. the ones thar r new.
-        ...newResults.filter(
-          (newItem) => !prev.some((existing) => existing.id === newItem.id)
-        ),
-      ]);
+      // if query is empty then just set the api data as it is
+      if (query.trim() === "") {
+        setListItems(newResults);
+      } else {
+        // now here filter the previous and new results. we don't want duplicates in our render
+        setListItems((prev) => [
+          // filter prev results first. see if the interest name matches the query string
+          ...filterResults(prev, query),
+          // now Filter newResults to keep only items that are not already in prev
+          // For each newItem in newResults, check if any item in prev has the same id
+          // Only include newItem if (no) matching id is found in prev. this way we only keep the fresh ones. the ones thar r new.
+          ...newResults.filter(
+            (newItem) => !prev.some((existing) => existing.id === newItem.id)
+          ),
+        ]);
+      }
     } catch (error) {
       console.log(error);
     } finally {
@@ -112,17 +118,29 @@ export default function Search() {
    */
   useEffect(() => {
     onSearch("");
+
+    return () => {
+      cache.clear();
+    };
   }, []);
 
   return (
     <View style={styles.container}>
       <View style={{ flex: 1, flexDirection: "column" }}>
-        {/* loader while api call */}
-        {isLoading && <Loader />}
         {/* interest list. flatlist for better performance */}
         <FlatList
           data={listItems}
           inverted={true}
+          // loader while api call. empty skeleton will show for good UI UX
+          ListFooterComponent={() =>
+            isLoading && (
+              <View>
+                {Array.from({ length: 10 }).map((_, index) => (
+                  <SkeletonListItem key={index} />
+                ))}
+              </View>
+            )
+          }
           keyExtractor={(item) => item.id.toString()}
           renderItem={({ item, index }) => (
             <ListItem key={item.id} interest={item} />
