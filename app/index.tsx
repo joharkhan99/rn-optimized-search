@@ -10,6 +10,7 @@ export default function Index() {
         alignItems: "center",
       }}
     >
+      {/* button to redirect you to search page */}
       <Link href={"/search"} style={styles.button}>
         <Text style={styles.buttonText}>+ Interests</Text>
       </Link>
