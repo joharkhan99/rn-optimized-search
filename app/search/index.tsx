@@ -4,10 +4,9 @@ import { Interest } from "@/types";
 import { useEffect, useState } from "react";
 import { FlatList, StyleSheet, Text, View } from "react-native";
 import SkeletonListItem from "@/components/SkeletonListItem";
-
-// this will act as our cache storage. it will store interests array for query string key.
-// e.g: {'a': [], 'ap':[], ....}
-const cache = new Map<String, Interest[]>();
+import { useDispatch, useSelector } from "react-redux";
+import { RootState } from "@/store/store";
+import { addToCache, clearCache } from "@/store/searchSlice";
 
 // this is the main task. which is calling api and searching results
 export default function Search() {
@@ -15,14 +14,18 @@ export default function Search() {
   const [listItems, setListItems] = useState<Interest[]>([]);
   // this will help in showing loader on screen during api calls
   const [isLoading, setIsLoading] = useState(false);
+  const dispatch = useDispatch();
+  // this will act as our cache storage. it will store interests array for query string key.
+  // e.g: {'a': [], 'ap':[], ....}
+  const cache = useSelector((state: RootState) => state.search.cache);
 
   /**
    * This method will go through the cache Map() and see if there are any keys matching searched query
    */
   const searchCacheResult = (query: string) => {
     // first it gets al the keys from cache/MAP()
-    const cachedQueriesKeys = Array.from(cache.keys());
-    // they it wil filter is out by checking if key sarts with the query
+    const cachedQueriesKeys = Array.from(Object.keys(cache));
+    // they it wil filter is out by checking if key starts with the query
     const matchedQueriesKeys = cachedQueriesKeys.filter((key) =>
       query.startsWith(key.toString())
     );
@@ -33,9 +36,7 @@ export default function Search() {
       (a, b) => b.length - a.length
     );
     // returns null if no keys are found.
-    return sortedQueriesKeys.length > 0
-      ? cache.get(sortedQueriesKeys[0])
-      : null;
+    return sortedQueriesKeys.length > 0 ? cache[sortedQueriesKeys[0]] : null;
   };
 
   /**
@@ -87,8 +88,8 @@ export default function Search() {
       const data = await response.json();
       // returned data has a field called autocomplete
       const newResults: Interest[] = data.autocomplete;
-      // set the newResult to searched query. so something liek this {"apple": [{},{},{}....]}
-      cache.set(query, newResults);
+      // set the newResult to searched query. so something like this {"apple": [{},{},{}....]}
+      dispatch(addToCache({ query, interests: newResults }));
       // if query is empty then just set the api data as it is
       if (query.trim() === "") {
         setListItems(newResults);
@@ -120,7 +121,7 @@ export default function Search() {
     onSearch("");
 
     return () => {
-      cache.clear();
+      dispatch(clearCache());
     };
   }, []);
 
